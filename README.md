@@ -37,12 +37,13 @@ python manage.py runserver
 ### Пример запроса на эндпоинт /api/auth/users/:
 
 Отправляем POST-запрос с такими данными:
+```sh
 {
     "email": "coder.love@vk.ru",
     "password": "intern123",
     "username": "Chance"
 }
-
+```
 Ответ сервера:
 
 ![](https://sun9-78.userapi.com/impg/ZxlVN49P_YD9AW2MEcRl2sBYXOZogZTJBDEagw/EBf-Sl5eLcw.jpg?size=151x25&quality=95&sign=f5ae659630fff80206d9a1d9b7078210&type=album)
