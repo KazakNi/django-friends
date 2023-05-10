@@ -1,0 +1,2 @@
+# django-friends
+# django-friends
