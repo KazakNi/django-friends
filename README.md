@@ -10,7 +10,7 @@
 
 ## _Стек:_
 
-- PostrgeSQL, DRF, Docker
+- PostrgeSQL, DRF
 
 ### Развертка репозитория на локальном сервере:
 
