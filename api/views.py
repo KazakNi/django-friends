@@ -4,8 +4,7 @@ from rest_framework import status
 from users.models import FriendshipRequest, Friendship
 from users.models import MyUser
 from rest_framework.decorators import action
-from .serializers import (BaseUserSerializer, RequestSerializer,
-                          FriendshipSerializer)
+from .serializers import (BaseUserSerializer, RequestSerializer, FriendshipSerializer)
 from django.shortcuts import get_object_or_404
 from .utils import get_requests, delete_request, get_friends, check_friendship
 from django.db.transaction import atomic
@@ -14,7 +13,6 @@ from django.db import models
 
 class FriendShipViewset(ModelViewSet):
     queryset = Friendship.objects.all()
-    serializer_class = FriendshipSerializer
 
     @action(methods=['delete'], detail=True)
     def delete_friend(self, request, pk=None):
@@ -66,12 +64,11 @@ class FriendShipViewset(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         user = self.request.user
+        author = MyUser.objects.filter(username=user)[:1]
         result = get_friends(user)
-        data = {'friends': set(result)}
-        serializer = FriendshipSerializer(data=data)
-        if serializer.is_valid(raise_exception=True):
-            return Response(serializer.data,
-                            status=status.HTTP_200_OK)
+        serializer = FriendshipSerializer(instance=author, many=True,
+                                          context={'friends': result})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RequestViewSet(ModelViewSet):
@@ -84,11 +81,11 @@ class RequestViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         user = self.request.user
+        author = MyUser.objects.filter(username=user)[:1]
         from_me, to_me = get_requests(user)
-        data = {'outcoming': from_me, 'incoming': to_me}
-        serializer = RequestSerializer(data=data)
-        if serializer.is_valid(raise_exception=True):
-            return Response(serializer.data,
+        context = {'outcoming': from_me, 'incoming': to_me}
+        serializer = RequestSerializer(instance=author, context=context, many=True)
+        return Response(serializer.data,
                             status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=True)

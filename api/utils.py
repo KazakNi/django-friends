@@ -8,11 +8,16 @@ from django.db import models
 
 def get_requests(user):
     query = FriendshipRequest.objects.select_related('from_user')
-    from_ = query.filter(from_user=user).annotate(recipients=models.F('to_user__username')).values('recipients')
-    to_me = query.filter(to_user=user).annotate(senders=models.F('from_user__username')).values('senders')
-    outcoming = [request['recipients'] for request in from_]
-    incoming = [request['senders'] for request in to_me]
-    print(outcoming)
+    from_ = (query.filter(from_user=user).
+             annotate(recipients=models.F('to_user__username')).
+             values('recipients'))
+    to_me = (query.filter(to_user=user).
+             annotate(senders=models.F('from_user__username')).
+             values('senders'))
+    outcoming_requests = [request['recipients'] for request in from_]
+    incoming_requests = [request['senders'] for request in to_me]
+    outcoming = MyUser.objects.filter(username__in=outcoming_requests)
+    incoming = MyUser.objects.filter(username__in=incoming_requests)
     return outcoming, incoming
 
 
@@ -34,7 +39,8 @@ def get_friends(user):
                        values('friends'))
     for friend in i_am_in_friends:
         friends.append(friend['friends'])
-    return friends
+    query = MyUser.objects.filter(username__in=friends)
+    return query
 
 
 def delete_request(user, pk):
