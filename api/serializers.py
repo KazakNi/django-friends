@@ -1,7 +1,7 @@
 from djoser.serializers import UserCreateSerializer as BaseDjoserUserSerializer
 from users.models import MyUser, FriendshipRequest, Friendship
-from rest_framework.serializers import ModelSerializer, ReadOnlyField, PrimaryKeyRelatedField
-
+from rest_framework.serializers import ModelSerializer, SerializerMethodField, ListField
+from rest_framework import serializers
 
 
 class BaseUserSerializer(BaseDjoserUserSerializer):
@@ -11,10 +11,9 @@ class BaseUserSerializer(BaseDjoserUserSerializer):
         fields = ('id', 'username', 'email')
 
 
-class RequestSerializer(ModelSerializer):
-    class Meta:
-        model = FriendshipRequest
-        fields = ('__all__')
+class RequestSerializer(serializers.Serializer):
+    outcoming = ListField()
+    incoming = ListField()
 
 
 class FriendSerializer(ModelSerializer):
@@ -24,9 +23,8 @@ class FriendSerializer(ModelSerializer):
 
 
 class FriendshipSerializer(ModelSerializer):
-    following = BaseUserSerializer()
-    follower_name = ReadOnlyField(source='follower.username')
+    friends = ListField()
 
     class Meta:
-        model = Friendship
-        fields = ('following', 'follower_name',)
+        model = MyUser
+        fields = ('friends',)
