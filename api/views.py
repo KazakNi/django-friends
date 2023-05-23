@@ -7,21 +7,23 @@ from rest_framework.decorators import action
 from .serializers import (BaseUserSerializer, RequestSerializer,
                           FriendshipSerializer)
 from django.shortcuts import get_object_or_404
-from .utils import get_requests, delete_request
+from .utils import get_requests, delete_request, get_friends, check_friendship
 from django.db.transaction import atomic
 from django.db import models
 
 
 class FriendShipViewset(ModelViewSet):
     queryset = Friendship.objects.all()
-    serializer_class = FriendshipSerializer
 
     @action(methods=['delete'], detail=True)
     def delete_friend(self, request, pk=None):
         """Удалить пользователя из друзей."""
         user = self.request.user
         follower = MyUser.objects.get(id=pk)
-        obj = get_object_or_404(Friendship, following=user, follower=follower)
+        obj = get_object_or_404(Friendship, (models.Q(follower=user,
+                                                      following=follower)
+                                             | models.Q(follower=follower,
+                                                        following=user)))
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -30,10 +32,7 @@ class FriendShipViewset(ModelViewSet):
         """Получить статус отношений с пользователем."""
         user = self.request.user
         target_user = MyUser.objects.get(id=pk)
-        friends = Friendship.objects.filter((models.Q(follower=user,
-                                                      following=target_user)
-                                             | models.Q(follower=target_user,
-                                                        following=user)))
+        friends = check_friendship(user, target_user)
         request_from_me = (FriendshipRequest.objects.
                            filter(from_user=user, to_user=target_user).
                            exists())
@@ -66,11 +65,11 @@ class FriendShipViewset(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         user = self.request.user
-        friends = Friendship.objects.filter(following=user)
-        serializer = FriendshipSerializer(
-                        friends, many=True)
-        return Response(serializer.data,
-                        status=status.HTTP_200_OK)
+        author = MyUser.objects.filter(username=user)[:1]
+        result = get_friends(user)
+        serializer = FriendshipSerializer(instance=author, many=True,
+                                          context={'friends': result})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RequestViewSet(ModelViewSet):
@@ -81,33 +80,33 @@ class RequestViewSet(ModelViewSet):
             return RequestSerializer
         return BaseUserSerializer
 
-    def get_serializer_context(self):
+    def list(self, request, *args, **kwargs):
         user = self.request.user
-        context = super().get_serializer_context()
-        context.update({'user': user})
-        return context
-
-    @action(methods=['get'], detail=False)
-    def get_incoming_requests(self, request):
-        """Посмотреть входящие заявки в друзья."""
-        user = self.request.user
-        return get_requests(user=user, actor='to_user')
-
-    @action(methods=['get'], detail=False)
-    def get_outcoming_requests(self, request):
-        """Посмотреть исходящие заявки в друзья."""
-        user = self.request.user
-        return get_requests(user=user, actor='from_user')
+        author = MyUser.objects.filter(username=user)[:1]
+        from_me, to_me = get_requests(user)
+        context = {'outcoming': from_me, 'incoming': to_me}
+        serializer = RequestSerializer(instance=author, context=context,
+                                       many=True)
+        return Response(serializer.data,
+                        status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=True)
     def send(self, request, pk=None):
         """Отправить заявку в друзья."""
         user = self.request.user
         following = MyUser.objects.get(id=pk)
-        meeting_query = FriendshipRequest.objects.get(from_user_id=pk,
-                                                      to_user=user)
-        if meeting_query:
+        meeting_query = FriendshipRequest.objects.filter(from_user_id=pk,
+                                                         to_user=user)
+        if user == following:
+            return Response({'message':
+                             'Вы не можете отправить заявку сам себе!'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        elif meeting_query.exists():
+            meeting_query.delete()
             return self.accept(request, pk=pk)
+        elif check_friendship(user, following):
+            return Response({'message': 'Вы уже друзьях!'},
+                            status=status.HTTP_400_BAD_REQUEST)
         else:
             frendship_request, created = (FriendshipRequest.objects.
                                           get_or_create(from_user=user,
@@ -125,7 +124,7 @@ class RequestViewSet(ModelViewSet):
         """Отклонить заявку в друзья."""
         user = self.request.user
         delete_request(user=user, pk=pk)
-        return Response({'message': 'Запрос в друзья отклонена!'})
+        return Response({'message': 'Запрос в друзья отклонён!'})
 
     @atomic
     @action(methods=['post'], detail=True)
@@ -138,7 +137,6 @@ class RequestViewSet(ModelViewSet):
         if created:
             serializer = BaseUserSerializer(
                     follower, many=False)
-            delete_request(user=user, pk=pk)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response({'message': 'Вы уже добавлены!'},
                         status=status.HTTP_400_BAD_REQUEST)
