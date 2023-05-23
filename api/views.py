@@ -4,7 +4,8 @@ from rest_framework import status
 from users.models import FriendshipRequest, Friendship
 from users.models import MyUser
 from rest_framework.decorators import action
-from .serializers import (BaseUserSerializer, RequestSerializer, FriendshipSerializer)
+from .serializers import (BaseUserSerializer, RequestSerializer,
+                          FriendshipSerializer)
 from django.shortcuts import get_object_or_404
 from .utils import get_requests, delete_request, get_friends, check_friendship
 from django.db.transaction import atomic
@@ -84,9 +85,10 @@ class RequestViewSet(ModelViewSet):
         author = MyUser.objects.filter(username=user)[:1]
         from_me, to_me = get_requests(user)
         context = {'outcoming': from_me, 'incoming': to_me}
-        serializer = RequestSerializer(instance=author, context=context, many=True)
+        serializer = RequestSerializer(instance=author, context=context,
+                                       many=True)
         return Response(serializer.data,
-                            status=status.HTTP_200_OK)
+                        status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=True)
     def send(self, request, pk=None):
@@ -96,7 +98,8 @@ class RequestViewSet(ModelViewSet):
         meeting_query = FriendshipRequest.objects.filter(from_user_id=pk,
                                                          to_user=user)
         if user == following:
-            return Response({'message': 'Вы не можете отправить заявку сам себе!'},
+            return Response({'message':
+                             'Вы не можете отправить заявку сам себе!'},
                             status=status.HTTP_400_BAD_REQUEST)
         elif meeting_query.exists():
             meeting_query.delete()
